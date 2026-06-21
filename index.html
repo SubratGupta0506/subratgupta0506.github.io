@@ -119,6 +119,22 @@ body{
 .top-meta span b{color:var(--dim2);font-weight:500;}
 .top-meta .live-val{color:var(--signal);}
 
+#resume-btn-top{
+  display:none;
+  font-family:var(--mono);
+  font-size:10.5px;
+  letter-spacing:.04em;
+  color:var(--signal);
+  text-decoration:none;
+  border:1px solid var(--signal-dim);
+  background:rgba(94,255,184,0.06);
+  padding:5px 10px;
+  white-space:nowrap;
+  margin-left:auto;
+  flex-shrink:0;
+}
+#resume-btn-top:active{background:rgba(94,255,184,0.16);}
+
 /* body: sidebar (channel strip) + main display */
 #body{
   flex:1;display:flex;overflow:hidden;
@@ -353,16 +369,62 @@ body{
   opacity:0;pointer-events:none;
 }
 
+/* MOBILE BOTTOM TAB BAR */
+#mobile-tabs{
+  display:none;
+}
+.mtab{
+  display:flex;
+}
+
 /* responsive */
 @media(max-width:880px){
   #channels{width:0;display:none;}
-  #panes{padding:20px 18px 50px;}
+  #panes{padding:20px 18px 90px;}
   .contact-grid{grid-template-columns:1fr;}
   .stat-rail{flex-wrap:wrap;}
   .stat-cell{flex:1 1 50%;border-bottom:1px solid var(--line);}
   #topstrip{padding:0 12px;gap:10px;}
   .top-meta{display:none;}
   .pane-title{font-size:22px;}
+  #resume-btn-top{display:inline-flex;align-items:center;}
+
+  #mobile-tabs{
+    display:flex;
+    position:fixed;
+    left:0;right:0;bottom:0;
+    height:60px;
+    background:var(--panel);
+    border-top:1px solid var(--line);
+    z-index:200;
+    padding-bottom:env(safe-area-inset-bottom, 0);
+  }
+  .mtab{
+    flex:1;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:3px;
+    cursor:pointer;
+    color:var(--dim2);
+    border-top:2px solid transparent;
+    transition:color .15s,border-color .15s;
+  }
+  .mtab.active{
+    color:var(--signal);
+    border-top-color:var(--signal);
+    background:rgba(94,255,184,0.04);
+  }
+  .mtab-ico{font-size:15px;line-height:1;}
+  .mtab-label{font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;}
+
+  /* status bar would collide with fixed tab bar on small screens; hide it on mobile */
+  #statusbar{display:none;}
+}
+
+@media(max-width:380px){
+  .mtab-label{font-size:7.5px;}
+  .mtab-ico{font-size:13px;}
 }
 </style>
 </head>
@@ -390,6 +452,7 @@ body{
       <span><b>MODE</b> <span class="live-val">LIVE DECODE</span></span>
       <span><b>LOC</b> <span class="live-val">BLR, IN</span></span>
     </div>
+    <a id="resume-btn-top" href="#" download="Subrat_Gupta_Resume.pdf" title="Download Résumé">↓ Résumé</a>
   </div>
 
   <div id="body">
@@ -655,6 +718,28 @@ body{
       <span>GITAM UNIVERSITY · BLR</span>
     </div>
   </div>
+
+  <!-- MOBILE BOTTOM TAB BAR (replaces sidebar nav under 880px) -->
+  <div id="mobile-tabs">
+    <div class="mtab active" data-pane="profile">
+      <span class="mtab-ico">◉</span><span class="mtab-label">Profile</span>
+    </div>
+    <div class="mtab" data-pane="skills">
+      <span class="mtab-ico">◈</span><span class="mtab-label">Skills</span>
+    </div>
+    <div class="mtab" data-pane="experience">
+      <span class="mtab-ico">◎</span><span class="mtab-label">Work</span>
+    </div>
+    <div class="mtab" data-pane="projects">
+      <span class="mtab-ico">▣</span><span class="mtab-label">Projects</span>
+    </div>
+    <div class="mtab" data-pane="achievements">
+      <span class="mtab-ico">★</span><span class="mtab-label">Awards</span>
+    </div>
+    <div class="mtab" data-pane="contact">
+      <span class="mtab-ico">✉</span><span class="mtab-label">Contact</span>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -705,9 +790,13 @@ tickClock(); setInterval(tickClock,1000);
 
 /* ====== CHANNEL SWITCHING ====== */
 const channels = document.querySelectorAll('.channel');
+const mobileTabs = document.querySelectorAll('.mtab');
 const panes = document.querySelectorAll('.pane');
 const scopeReadout = document.getElementById('scope-readout');
 const statusChannel = document.getElementById('status-channel');
+
+const channelOrder = ['profile','skills','experience','projects','achievements','contact'];
+const channelLabels = ['PROFILE','SKILLS','EXPERIENCE','PROJECTS','ACHIEVEMENTS','CONTACT / OUT'];
 
 const scopeInfo = {
   profile: 'CH 01 · <b>PROFILE</b> · CGPA 9.10/10',
@@ -718,19 +807,28 @@ const scopeInfo = {
   contact: 'CH 06 · <b>OUTPUT</b> · ready'
 };
 
+function switchToPane(target){
+  const idx = channelOrder.indexOf(target);
+  if(idx === -1) return;
+
+  channels.forEach(c=>c.classList.toggle('active', c.dataset.pane === target));
+  mobileTabs.forEach(t=>t.classList.toggle('active', t.dataset.pane === target));
+  panes.forEach(p=>p.classList.remove('active'));
+  document.getElementById('pane-'+target).classList.add('active');
+
+  scopeReadout.innerHTML = scopeInfo[target];
+  statusChannel.textContent = 'CH.0'+(idx+1)+' '+channelLabels[idx];
+  document.getElementById('panes').scrollTop = 0;
+  setActiveScopeChannel(idx);
+  runDecodeForPane(target);
+}
+
 channels.forEach(ch=>{
-  ch.addEventListener('click', ()=>{
-    const target = ch.dataset.pane;
-    channels.forEach(c=>c.classList.remove('active'));
-    ch.classList.add('active');
-    panes.forEach(p=>p.classList.remove('active'));
-    document.getElementById('pane-'+target).classList.add('active');
-    scopeReadout.innerHTML = scopeInfo[target];
-    statusChannel.textContent = 'CH.0'+(Array.from(channels).indexOf(ch)+1)+' '+ch.querySelector('.ch-name').textContent.toUpperCase();
-    document.getElementById('panes').scrollTop = 0;
-    setActiveScopeChannel(Array.from(channels).indexOf(ch));
-    runDecodeForPane(target);
-  });
+  ch.addEventListener('click', ()=>switchToPane(ch.dataset.pane));
+});
+
+mobileTabs.forEach(tab=>{
+  tab.addEventListener('click', ()=>switchToPane(tab.dataset.pane));
 });
 
 /* ====== DECODE TEXT ENGINE ====== */
@@ -979,6 +1077,7 @@ document.addEventListener('keydown', (e)=>{
   }
   wireResumeLink(document.getElementById('resume-btn'));
   wireResumeLink(document.getElementById('resume-card'));
+  wireResumeLink(document.getElementById('resume-btn-top'));
 })();
 </script>
 </body>
